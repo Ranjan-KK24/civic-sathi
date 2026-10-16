@@ -1,75 +1,115 @@
-# React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Civic Sathi 🇮🇳
+### One Citizen, One Step, One Nation.
 
-Currently, two official plugins are available:
+Civic Sathi is a civic technology platform designed to help citizens report local infrastructure problems, discover nearby civic issues, and encourage community participation.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Our mission is to make cities cleaner, safer, and more accountable by connecting citizens with actionable civic information.
 
-## React Compiler
+## 🎯 Project Goals
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Make local civic issue reporting easier.
+- Improve visibility of neighbourhood problems.
+- Encourage citizens to take responsibility for public spaces.
+- Support transparency in issue tracking and resolution.
 
-## Expanding the ESLint configuration
+## ✨ Planned Features
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Citizen Platform
+- Report potholes, garbage, waterlogging, and broken streetlights.
+- Submit photos and location details.
+- Explore reported issues on an interactive map.
+- Track issue status and resolution progress.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Municipal Admin Dashboard
+- View and manage reported issues.
+- Prioritize issues for action.
+- Update complaint statuses.
+- Verify resolutions using supporting evidence.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Future Enhancements
+- Duplicate issue detection.
+- Civic Severity Index (CSI).
+- Citizen points and badges.
+- Community upvoting and engagement.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🛠️ Technology Stack
 
+**Current frontend**
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+
+**Planned backend**
+- Node.js
+- Express
+- PostgreSQL
+- PostGIS
+- Leaflet
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js
+- npm
+- Git
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Ranjan-KK24/civic-sathi.git
+cd civic-sathi
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Install dependencies:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm install
 ```
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Open the local URL displayed in your terminal.
+
+## 📁 Project Structure
+
+```text
+civic-sathi/
+├── public/
+├── src/
+│   ├── assets/
+│   ├── App.tsx
+│   ├── App.css
+│   ├── index.css
+│   └── main.tsx
+├── index.html
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
+```
+
+## 📍 Initial Focus
+
+The project initially focuses on civic issues in Cuttack, Odisha, with the potential to expand to other cities.
+
+## 📌 Development Status
+
+Currently in development.
+
+The public homepage and responsive navigation are implemented. Citizen reporting, interactive maps, backend APIs, database integration, and the admin dashboard are planned.
+
+## 🤝 Contributing
+
+Suggestions and contributions are welcome as the project develops.
+
+## 📄 License
+
+A license has not yet been selected.
