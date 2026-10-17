@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 const sampleReports = [
   {
@@ -37,6 +37,7 @@ const navigation = [
 
 function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
 
   const stats = [
     {
@@ -66,57 +67,26 @@ function Dashboard() {
   ];
 
   const statusStyle: Record<string, string> = {
-    "Submitted": "bg-blue-50 text-blue-700",
+    Submitted: "bg-blue-50 text-blue-700",
     "Under Review": "bg-purple-50 text-purple-700",
     "In Progress": "bg-amber-50 text-amber-700",
-    "Resolved": "bg-green-50 text-green-700",
-    "Rejected": "bg-red-50 text-red-700",
+    Resolved: "bg-green-50 text-green-700",
+    Rejected: "bg-red-50 text-red-700",
   };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-slate-700 lg:hidden"
-            aria-label="Toggle sidebar"
-          >
-            ☰
-          </button>
-
-          <Link to="/" className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-700 font-bold text-white">
-              C
-            </span>
-            <span className="text-lg font-bold">
-              Civic <span className="text-blue-700">Sathi</span>
-            </span>
-          </Link>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-slate-500 sm:block">
-            Citizen Portal
-          </span>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
-            R
-          </div>
-        </div>
-      </header>
-
       {sidebarOpen && (
         <button
           type="button"
           aria-label="Close sidebar"
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-slate-950/30 lg:hidden"
+          className="fixed inset-0 top-[73px] z-40 bg-slate-950/30 lg:hidden"
         />
       )}
 
       <aside
-        className={`fixed bottom-0 left-0 top-16 z-50 w-64 border-r border-slate-200 bg-white p-4 transition-transform lg:translate-x-0 ${
+        className={`fixed bottom-0 left-0 top-[73px] z-50 w-64 border-r border-slate-200 bg-white p-4 transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -125,33 +95,50 @@ function Dashboard() {
         </p>
 
         <nav className="space-y-1">
-          {navigation.map((item) => (
-            <Link
-              key={item.label}
-              to={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition ${
-                item.href === "/dashboard"
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-blue-700"
-              }`}
-            >
-              <span className="w-6 text-center text-lg">{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
+          {navigation.map((item) => {
+            const isActive = location.pathname === item.href;
+
+            return (
+              <Link
+                key={item.label}
+                to={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition ${
+                  isActive
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-blue-700"
+                }`}
+              >
+                <span className="w-6 text-center text-lg">
+                  {item.icon}
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="absolute bottom-5 left-4 right-4 rounded-xl bg-blue-50 p-4">
-          <p className="font-semibold text-blue-900">Your voice matters!</p>
+          <p className="font-semibold text-blue-900">
+            Your voice matters!
+          </p>
           <p className="mt-1 text-xs leading-5 text-blue-800">
             Every report is a step towards a better community.
           </p>
         </div>
       </aside>
 
-      <main className="min-w-0 px-4 pb-10 pt-24 sm:px-6 lg:ml-64 lg:px-8">
+      <main className="min-w-0 px-4 pb-10 pt-28 sm:px-6 lg:ml-64 lg:px-8">
         <div className="mx-auto max-w-7xl">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="mb-5 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 lg:hidden"
+            aria-label="Open dashboard menu"
+          >
+            ☰ Menu
+          </button>
+
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <p className="text-sm font-medium text-blue-700">
@@ -200,7 +187,7 @@ function Dashboard() {
           </div>
 
           <section className="mt-8 grid gap-6 xl:grid-cols-3">
-            <div className="rounded-2xl bg-gradient-to-r from-blue-700 to-blue-600 p-6 text-white xl:col-span-2 sm:p-8">
+            <div className="rounded-2xl bg-gradient-to-r from-blue-700 to-blue-600 p-6 text-white sm:p-8 xl:col-span-2">
               <p className="text-sm font-semibold text-blue-100">
                 MAKE A DIFFERENCE
               </p>

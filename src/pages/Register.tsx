@@ -35,7 +35,7 @@ function Register() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 pb-12 pt-28">
       <div className="w-full max-w-md">
         <a href="/" className="mb-8 flex items-center justify-center gap-2">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-700 text-xl font-bold text-white">

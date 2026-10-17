@@ -1,18 +1,55 @@
 
 import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Temporary frontend demo.
+  // We will replace this with real authentication from the backend.
+  const isLoggedIn = localStorage.getItem("civicSathiLoggedIn") === "true";
 
   const closeMenu = () => setMenuOpen(false);
 
+  const goToSection = (sectionId: string) => {
+    closeMenu();
+
+    if (location.pathname !== "/") {
+      navigate("/", { state: { scrollTo: sectionId } });
+      return;
+    }
+
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: "smooth",
+    });
+  };
+
+  const handleReportClick = () => {
+    closeMenu();
+
+    if (isLoggedIn) {
+      navigate("/report-issue");
+    } else {
+      navigate("/login", {
+        state: {
+          message: "Please log in or create an account to report a civic issue.",
+        },
+      });
+    }
+  };
+
+  const navLinkClass =
+    "rounded-lg px-3 py-2 font-medium transition hover:bg-blue-50 hover:text-blue-700";
+
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white shadow-sm">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-6">
-        <a
-          href="#home"
+      <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4 sm:px-6">
+        <Link
+          to="/"
           onClick={closeMenu}
-          className="flex items-center gap-2"
+          className="flex shrink-0 items-center gap-2"
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-700 text-xl font-bold text-white">
             C
@@ -21,26 +58,64 @@ function Navbar() {
           <span className="text-xl font-bold">
             Civic <span className="text-blue-700">Sathi</span>
           </span>
-        </a>
+        </Link>
 
-        <div className="hidden items-center gap-8 md:flex">
-          <a href="#home" className="font-medium hover:text-blue-700">
+        <div className="hidden items-center gap-2 lg:flex">
+          <button
+            type="button"
+            onClick={() => goToSection("home")}
+            className={navLinkClass}
+          >
             Home
-          </a>
-          <a href="#features" className="font-medium hover:text-blue-700">
+          </button>
+
+          <button
+            type="button"
+            onClick={() => goToSection("features")}
+            className={navLinkClass}
+          >
             Features
-          </a>
-          <a href="#about" className="font-medium hover:text-blue-700">
+          </button>
+
+          <button
+            type="button"
+            onClick={() => goToSection("about")}
+            className={navLinkClass}
+          >
             About Us
-          </a>
+          </button>
+
+          <Link to="/map" className={navLinkClass} onClick={closeMenu}>
+            Explore Map
+          </Link>
         </div>
 
-        <a
-          href="#report"
-          className="hidden rounded-lg bg-blue-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 md:inline-flex"
-        >
-          Report an Issue
-        </a>
+        <div className="hidden items-center gap-3 md:flex">
+          {isLoggedIn ? (
+            <Link
+              to="/dashboard"
+              className="rounded-lg bg-blue-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="rounded-lg px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+              >
+                Login
+              </Link>
+
+              <Link
+                to="/register"
+                className="rounded-lg bg-blue-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
+              >
+                Register
+              </Link>
+            </>
+          )}
+        </div>
 
         <button
           type="button"
@@ -48,7 +123,7 @@ function Navbar() {
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
           aria-controls="mobile-navigation"
-          className="rounded-lg border border-slate-200 p-2 hover:bg-slate-100 md:hidden"
+          className="rounded-lg border border-slate-200 p-2 hover:bg-slate-100 lg:hidden"
         >
           {menuOpen ? (
             <svg
@@ -86,40 +161,76 @@ function Navbar() {
       {menuOpen && (
         <div
           id="mobile-navigation"
-          className="border-t border-slate-200 bg-white px-5 py-4 shadow-lg md:hidden"
+          className="border-t border-slate-200 bg-white px-5 py-4 shadow-lg lg:hidden"
         >
           <div className="mx-auto flex max-w-7xl flex-col gap-2">
-            <a
-              href="#home"
-              onClick={closeMenu}
-              className="rounded-lg px-4 py-3 hover:bg-blue-50 hover:text-blue-700"
+            <button
+              type="button"
+              onClick={() => goToSection("home")}
+              className={`text-left ${navLinkClass}`}
             >
               Home
-            </a>
+            </button>
 
-            <a
-              href="#features"
-              onClick={closeMenu}
-              className="rounded-lg px-4 py-3 hover:bg-blue-50 hover:text-blue-700"
+            <button
+              type="button"
+              onClick={() => goToSection("features")}
+              className={`text-left ${navLinkClass}`}
             >
               Features
-            </a>
+            </button>
 
-            <a
-              href="#about"
-              onClick={closeMenu}
-              className="rounded-lg px-4 py-3 hover:bg-blue-50 hover:text-blue-700"
+            <button
+              type="button"
+              onClick={() => goToSection("about")}
+              className={`text-left ${navLinkClass}`}
             >
               About Us
-            </a>
+            </button>
 
-            <a
-              href="#report"
+            <Link
+              to="/map"
               onClick={closeMenu}
+              className={navLinkClass}
+            >
+              Explore Map
+            </Link>
+
+            <button
+              type="button"
+              onClick={handleReportClick}
               className="mt-2 rounded-lg bg-blue-700 px-4 py-3 text-center font-semibold text-white hover:bg-blue-800"
             >
               Report an Issue
-            </a>
+            </button>
+
+            {isLoggedIn ? (
+              <Link
+                to="/dashboard"
+                onClick={closeMenu}
+                className="rounded-lg border border-slate-200 px-4 py-3 text-center font-semibold hover:bg-blue-50"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <Link
+                  to="/login"
+                  onClick={closeMenu}
+                  className="rounded-lg border border-slate-200 px-4 py-3 text-center font-semibold hover:bg-blue-50"
+                >
+                  Login
+                </Link>
+
+                <Link
+                  to="/register"
+                  onClick={closeMenu}
+                  className="rounded-lg border border-slate-200 px-4 py-3 text-center font-semibold hover:bg-blue-50"
+                >
+                  Register
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

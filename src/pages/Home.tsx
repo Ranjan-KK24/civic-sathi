@@ -1,4 +1,6 @@
 
+import { Link } from "react-router-dom";
+
 function Home() {
   return (
     <>
@@ -29,13 +31,13 @@ function Home() {
               better for everyone.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-4" id="report">
-              <a
-                href="#features"
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                to="/report-issue"
                 className="rounded-lg bg-blue-700 px-6 py-4 font-semibold text-white shadow-sm transition hover:bg-blue-800"
               >
-                Explore Civic Sathi →
-              </a>
+                Report an Issue →
+              </Link>
 
               <a
                 href="#about"
@@ -64,7 +66,6 @@ function Home() {
                 <p className="text-sm font-semibold text-blue-700">
                   Community action in progress
                 </p>
-
                 <p className="mt-1 text-base font-bold text-slate-900 sm:text-lg">
                   Together, we can build better neighbourhoods.
                 </p>
@@ -77,11 +78,9 @@ function Home() {
           <div className="mx-auto max-w-7xl px-6">
             <div className="mx-auto max-w-2xl text-center">
               <p className="font-semibold text-blue-700">WHAT WE DO</p>
-
               <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
                 A better way to care for your city
               </h2>
-
               <p className="mt-4 leading-7 text-slate-600">
                 Civic Sathi helps people report local issues and makes
                 community problems easier to see and understand.
@@ -89,32 +88,47 @@ function Home() {
             </div>
 
             <div className="mt-12 grid gap-6 md:grid-cols-3">
-              <article className="rounded-2xl border border-slate-200 p-7 transition hover:-translate-y-1 hover:shadow-lg">
+              <Link
+                to="/report-issue"
+                className="group block rounded-2xl border border-slate-200 p-7 transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg"
+              >
                 <span className="text-3xl">📍</span>
-                <h3 className="mt-5 text-xl font-bold">Report Issues</h3>
+                <h3 className="mt-5 text-xl font-bold group-hover:text-blue-700">
+                  Report Issues →
+                </h3>
                 <p className="mt-3 leading-7 text-slate-600">
                   Record local problems with descriptions, photos and
                   location details.
                 </p>
-              </article>
+              </Link>
 
-              <article className="rounded-2xl border border-slate-200 p-7 transition hover:-translate-y-1 hover:shadow-lg">
+              <Link
+                to="/map"
+                className="group block rounded-2xl border border-slate-200 p-7 transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg"
+              >
                 <span className="text-3xl">🗺️</span>
-                <h3 className="mt-5 text-xl font-bold">Explore the Map</h3>
+                <h3 className="mt-5 text-xl font-bold group-hover:text-blue-700">
+                  Explore the Map →
+                </h3>
                 <p className="mt-3 leading-7 text-slate-600">
                   Discover reported civic issues in your neighbourhood
                   through an interactive map.
                 </p>
-              </article>
+              </Link>
 
-              <article className="rounded-2xl border border-slate-200 p-7 transition hover:-translate-y-1 hover:shadow-lg">
+              <Link
+                to="/register"
+                className="group block rounded-2xl border border-slate-200 p-7 transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg"
+              >
                 <span className="text-3xl">🤝</span>
-                <h3 className="mt-5 text-xl font-bold">Build Community</h3>
+                <h3 className="mt-5 text-xl font-bold group-hover:text-blue-700">
+                  Build Community →
+                </h3>
                 <p className="mt-3 leading-7 text-slate-600">
-                  Encourage citizens to participate and take shared
-                  responsibility for public spaces.
+                  Join Civic Sathi and participate in improving your
+                  community and public spaces.
                 </p>
-              </article>
+              </Link>
             </div>
           </div>
         </section>
@@ -132,25 +146,37 @@ function Home() {
               taking action.
             </p>
 
-            <a
-              href="#home"
+            <Link
+              to="/register"
               className="mt-8 inline-block rounded-lg bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800"
             >
-              Back to top ↑
-            </a>
+              Join Civic Sathi →
+            </Link>
+
+            <div>
+              <a
+                href="#home"
+                className="mt-4 inline-block rounded-lg border border-slate-300 px-6 py-3 font-semibold hover:bg-white"
+              >
+                Back to top ↑
+              </a>
+            </div>
           </div>
         </section>
       </main>
 
       <footer className="bg-slate-950 py-8 text-white">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 sm:flex-row">
-          <p className="text-lg font-bold">
+          <Link to="/" className="text-lg font-bold">
             Civic <span className="text-blue-400">Sathi</span>
-          </p>
+          </Link>
 
-          <p className="text-sm text-slate-400">
-            One Citizen, One Step, One Nation.
-          </p>
+          <div className="flex flex-wrap justify-center gap-5 text-sm text-slate-300">
+            <Link to="/login" className="hover:text-white">Login</Link>
+            <Link to="/register" className="hover:text-white">Register</Link>
+            <Link to="/dashboard" className="hover:text-white">Dashboard</Link>
+            <Link to="/map" className="hover:text-white">Explore Map</Link>
+          </div>
 
           <p className="text-sm text-slate-400">
             © {new Date().getFullYear()} Civic Sathi

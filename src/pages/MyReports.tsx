@@ -85,7 +85,8 @@ function MyReports() {
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] =
     useState<"All" | ReportStatus>("All");
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [selectedReport, setSelectedReport] =
+    useState<Report | null>(null);
 
   const statusStyles: Record<ReportStatus, string> = {
     Submitted: "bg-blue-50 text-blue-700",
@@ -96,13 +97,16 @@ function MyReports() {
   };
 
   const filteredReports = sampleReports.filter((report) => {
+    const searchTerm = search.toLowerCase();
+
     const matchesSearch =
-      report.title.toLowerCase().includes(search.toLowerCase()) ||
-      report.id.toLowerCase().includes(search.toLowerCase()) ||
-      report.location.toLowerCase().includes(search.toLowerCase());
+      report.title.toLowerCase().includes(searchTerm) ||
+      report.id.toLowerCase().includes(searchTerm) ||
+      report.location.toLowerCase().includes(searchTerm);
 
     const matchesStatus =
-      selectedStatus === "All" || report.status === selectedStatus;
+      selectedStatus === "All" ||
+      report.status === selectedStatus;
 
     return matchesSearch && matchesStatus;
   });
@@ -115,42 +119,30 @@ function MyReports() {
     },
     {
       label: "Submitted",
-      value: sampleReports.filter((r) => r.status === "Submitted").length,
+      value: sampleReports.filter(
+        (report) => report.status === "Submitted"
+      ).length,
       color: "text-indigo-700 bg-indigo-50",
     },
     {
       label: "In Progress",
-      value: sampleReports.filter((r) => r.status === "In Progress").length,
+      value: sampleReports.filter(
+        (report) => report.status === "In Progress"
+      ).length,
       color: "text-amber-700 bg-amber-50",
     },
     {
       label: "Resolved",
-      value: sampleReports.filter((r) => r.status === "Resolved").length,
+      value: sampleReports.filter(
+        (report) => report.status === "Resolved"
+      ).length,
       color: "text-green-700 bg-green-50",
     },
   ];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
-        <Link to="/dashboard" className="flex items-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-700 text-xl font-bold text-white">
-            C
-          </span>
-          <span className="text-xl font-bold">
-            Civic <span className="text-blue-700">Sathi</span>
-          </span>
-        </Link>
-
-        <Link
-          to="/dashboard"
-          className="text-sm font-semibold text-blue-700 hover:underline"
-        >
-          ← Back to Dashboard
-        </Link>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 pb-8 pt-28 sm:px-6 lg:px-8">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-blue-700">
@@ -221,7 +213,9 @@ function MyReports() {
                   id="status-filter"
                   value={selectedStatus}
                   onChange={(event) =>
-                    setSelectedStatus(event.target.value as "All" | ReportStatus)
+                    setSelectedStatus(
+                      event.target.value as "All" | ReportStatus
+                    )
                   }
                   className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 >
@@ -243,7 +237,9 @@ function MyReports() {
                   <th className="px-6 py-4 font-semibold">Category</th>
                   <th className="px-6 py-4 font-semibold">Date</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 text-right font-semibold">Action</th>
+                  <th className="px-6 py-4 text-right font-semibold">
+                    Action
+                  </th>
                 </tr>
               </thead>
 
@@ -320,7 +316,7 @@ function MyReports() {
 
       {selectedReport && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4"
           onClick={() => setSelectedReport(null)}
         >
           <section
@@ -370,7 +366,9 @@ function MyReports() {
               </div>
               <div>
                 <dt className="text-slate-500">Reported date</dt>
-                <dd className="mt-1 font-semibold">{selectedReport.date}</dd>
+                <dd className="mt-1 font-semibold">
+                  {selectedReport.date}
+                </dd>
               </div>
               <div>
                 <dt className="text-slate-500">Location</dt>

@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+
 
 function Profile() {
   const [isEditing, setIsEditing] = useState(false);
@@ -77,25 +77,8 @@ function Profile() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
-        <Link to="/dashboard" className="flex items-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-700 text-xl font-bold text-white">
-            C
-          </span>
-          <span className="text-xl font-bold">
-            Civic <span className="text-blue-700">Sathi</span>
-          </span>
-        </Link>
 
-        <Link
-          to="/dashboard"
-          className="text-sm font-semibold text-blue-700 hover:underline"
-        >
-          ← Back to Dashboard
-        </Link>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-5xl px-4 pb-8 pt-28 sm:px-6 lg:px-8">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wider text-blue-700">
             Citizen Portal

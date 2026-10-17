@@ -1,6 +1,19 @@
 
 import { useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { Link } from "react-router-dom";
+import {
+  APIProvider,
+  Map,
+  AdvancedMarker,
+} from "@vis.gl/react-google-maps";
+
+const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+type Coordinates = {
+  lat: number;
+  lng: number;
+};
 
 function ReportIssue() {
   const [title, setTitle] = useState("");
@@ -11,22 +24,27 @@ function ReportIssue() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [message, setMessage] = useState("");
+  const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
 
-  const handlePhotoChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
       setMessage("Please select a valid image file.");
+      event.target.value = "";
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       setMessage("Image size must be 5 MB or less.");
+      event.target.value = "";
       return;
+    }
+
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
     }
 
     setPhoto(file);
@@ -34,7 +52,7 @@ function ReportIssue() {
     setMessage("");
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!category) {
@@ -47,27 +65,29 @@ function ReportIssue() {
     );
   };
 
+  const handleClearForm = () => {
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
+    }
+
+    setTitle("");
+    setCategory("");
+    setDescription("");
+    setLocation("");
+    setPriority("Normal");
+    setPhoto(null);
+    setPhotoPreview("");
+    setCoordinates(null);
+    setMessage("");
+
+    const input = document.getElementById("photo") as HTMLInputElement | null;
+    if (input) input.value = "";
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
-        <Link to="/dashboard" className="flex items-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-700 text-xl font-bold text-white">
-            C
-          </span>
-          <span className="text-xl font-bold">
-            Civic <span className="text-blue-700">Sathi</span>
-          </span>
-        </Link>
 
-        <Link
-          to="/dashboard"
-          className="text-sm font-semibold text-blue-700 hover:underline"
-        >
-          ← Back to Dashboard
-        </Link>
-      </header>
-
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-12">
+      <main className="mx-auto max-w-4xl px-4 pb-8 pt-28 sm:px-6 lg:pb-12">
         <div className="mb-8">
           <p className="text-sm font-semibold uppercase tracking-wider text-blue-700">
             Citizen Portal
@@ -76,9 +96,8 @@ function ReportIssue() {
             Report a Civic Issue
           </h1>
           <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-            Help improve your neighbourhood by reporting a problem.
-            Provide accurate details so the issue can be understood
-            and addressed.
+            Help improve your neighbourhood by reporting a problem. Provide
+            accurate details so the issue can be understood and addressed.
           </p>
         </div>
 
@@ -86,6 +105,7 @@ function ReportIssue() {
           onSubmit={handleSubmit}
           className="space-y-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8"
         >
+          {/* Issue information */}
           <section>
             <div className="mb-5">
               <h2 className="text-lg font-bold">Issue Information</h2>
@@ -197,11 +217,12 @@ function ReportIssue() {
             </div>
           </section>
 
+          {/* Issue location */}
           <section className="border-t border-slate-200 pt-7">
             <div className="mb-5">
               <h2 className="text-lg font-bold">Issue Location</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Enter a street, landmark, or area where the problem exists.
+                Enter a landmark or select the exact location on the map.
               </p>
             </div>
 
@@ -225,17 +246,76 @@ function ReportIssue() {
               className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
             />
 
-            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-              <p className="font-semibold text-slate-700">
-                Map location selection
+            <div className="mt-5">
+              <h3 className="mb-2 font-semibold text-slate-700">
+                Select the exact location
+              </h3>
+              <p className="mb-3 text-sm text-slate-500">
+                Click anywhere on the map to place a marker at the location
+                of the civic issue.
               </p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                Interactive map pin selection and GPS coordinates will
-                be added when we build the Explore Map feature.
-              </p>
+
+              {apiKey ? (
+                <div className="overflow-hidden rounded-xl border border-slate-200">
+                  <div className="h-[350px]">
+                    <APIProvider apiKey={apiKey}>
+                      <Map
+                        defaultCenter={{ lat: 20.2961, lng: 85.8245 }}
+                        defaultZoom={12}
+                        mapId="civic-sathi-explore-map"
+                        gestureHandling="greedy"
+                        style={{ width: "100%", height: "100%" }}
+                        onClick={(event) => {
+                          const position = event.detail.latLng;
+
+                          if (position) {
+                            setCoordinates({
+                              lat: position.lat,
+                              lng: position.lng,
+                            });
+                            setMessage("");
+                          }
+                        }}
+                      >
+                        {coordinates && (
+                          <AdvancedMarker position={coordinates} />
+                        )}
+                      </Map>
+                    </APIProvider>
+                  </div>
+                </div>
+              ) : (
+                <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                  Google Maps API key is missing. Check your .env.local file.
+                </p>
+              )}
+
+              {coordinates ? (
+                <div className="mt-3 rounded-lg bg-green-50 p-4 text-sm text-green-800">
+                  <p className="font-semibold">
+                    Location selected successfully!
+                  </p>
+                  <p className="mt-1">
+                    Latitude: {coordinates.lat.toFixed(6)}
+                  </p>
+                  <p>Longitude: {coordinates.lng.toFixed(6)}</p>
+                  <button
+                    type="button"
+                    onClick={() => setCoordinates(null)}
+                    className="mt-2 font-semibold underline"
+                  >
+                    Remove selected location
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">
+                  No map location selected yet.
+                </p>
+              )}
             </div>
           </section>
 
+          {/* Photo upload */}
           <section className="border-t border-slate-200 pt-7">
             <div className="mb-5">
               <h2 className="text-lg font-bold">Add a Photo</h2>
@@ -278,11 +358,14 @@ function ReportIssue() {
                   <button
                     type="button"
                     onClick={() => {
+                      URL.revokeObjectURL(photoPreview);
                       setPhoto(null);
                       setPhotoPreview("");
+
                       const input = document.getElementById(
                         "photo"
                       ) as HTMLInputElement | null;
+
                       if (input) input.value = "";
                     }}
                     className="text-sm font-semibold text-red-600 hover:underline"
@@ -294,31 +377,17 @@ function ReportIssue() {
             )}
           </section>
 
+          {/* Submit and clear */}
           <div className="border-t border-slate-200 pt-6">
             <p className="mb-5 text-sm leading-6 text-slate-500">
-              Please submit accurate information. Do not upload
-              photographs containing private information unrelated to
-              the civic issue.
+              Please submit accurate information. Do not upload photographs
+              containing private information unrelated to the civic issue.
             </p>
 
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
-                onClick={() => {
-                  setTitle("");
-                  setCategory("");
-                  setDescription("");
-                  setLocation("");
-                  setPriority("Normal");
-                  setPhoto(null);
-                  setPhotoPreview("");
-                  setMessage("");
-
-                  const input = document.getElementById(
-                    "photo"
-                  ) as HTMLInputElement | null;
-                  if (input) input.value = "";
-                }}
+                onClick={handleClearForm}
                 className="rounded-lg border border-slate-300 px-5 py-3 font-semibold text-slate-700 transition hover:bg-slate-100"
               >
                 Clear Form
