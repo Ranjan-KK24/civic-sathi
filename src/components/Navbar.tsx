@@ -7,11 +7,18 @@ function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Temporary frontend demo.
-  // We will replace this with real authentication from the backend.
-  const isLoggedIn = localStorage.getItem("civicSathiLoggedIn") === "true";
+  // Check the real authentication token
+  const isLoggedIn = Boolean(localStorage.getItem("token"));
 
   const closeMenu = () => setMenuOpen(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    closeMenu();
+    navigate("/");
+  };
 
   const goToSection = (sectionId: string) => {
     closeMenu();
@@ -46,6 +53,8 @@ function Navbar() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white shadow-sm">
       <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4 sm:px-6">
+
+        {/* Logo */}
         <Link
           to="/"
           onClick={closeMenu}
@@ -60,6 +69,7 @@ function Navbar() {
           </span>
         </Link>
 
+        {/* Desktop navigation */}
         <div className="hidden items-center gap-2 lg:flex">
           <button
             type="button"
@@ -85,19 +95,30 @@ function Navbar() {
             About Us
           </button>
 
-          <Link to="/map" className={navLinkClass} onClick={closeMenu}>
+          <Link to="/map" className={navLinkClass}>
             Explore Map
           </Link>
         </div>
 
+        {/* Desktop authentication buttons */}
         <div className="hidden items-center gap-3 md:flex">
           {isLoggedIn ? (
-            <Link
-              to="/dashboard"
-              className="rounded-lg bg-blue-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
-            >
-              Dashboard
-            </Link>
+            <>
+              <Link
+                to="/dashboard"
+                className="rounded-lg bg-blue-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
+              >
+                Dashboard
+              </Link>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                Logout
+              </button>
+            </>
           ) : (
             <>
               <Link
@@ -117,6 +138,7 @@ function Navbar() {
           )}
         </div>
 
+        {/* Mobile menu button */}
         <button
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
@@ -158,12 +180,14 @@ function Navbar() {
         </button>
       </nav>
 
+      {/* Mobile navigation */}
       {menuOpen && (
         <div
           id="mobile-navigation"
           className="border-t border-slate-200 bg-white px-5 py-4 shadow-lg lg:hidden"
         >
           <div className="mx-auto flex max-w-7xl flex-col gap-2">
+
             <button
               type="button"
               onClick={() => goToSection("home")}
@@ -205,13 +229,23 @@ function Navbar() {
             </button>
 
             {isLoggedIn ? (
-              <Link
-                to="/dashboard"
-                onClick={closeMenu}
-                className="rounded-lg border border-slate-200 px-4 py-3 text-center font-semibold hover:bg-blue-50"
-              >
-                Dashboard
-              </Link>
+              <>
+                <Link
+                  to="/dashboard"
+                  onClick={closeMenu}
+                  className="rounded-lg border border-slate-200 px-4 py-3 text-center font-semibold hover:bg-blue-50"
+                >
+                  Dashboard
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-lg border border-slate-200 px-4 py-3 text-center font-semibold hover:bg-slate-100"
+                >
+                  Logout
+                </button>
+              </>
             ) : (
               <div className="mt-2 grid grid-cols-2 gap-3">
                 <Link

@@ -1,7 +1,6 @@
 
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { Link } from "react-router-dom";
 import {
   APIProvider,
   Map,
@@ -52,18 +51,84 @@ function ReportIssue() {
     setMessage("");
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  
 
-    if (!category) {
-      setMessage("Please select an issue category.");
-      return;
+const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  event.preventDefault();
+
+  if (!category) {
+    setMessage("Please select an issue category.");
+    return;
+  }
+
+  setMessage("Submitting your report...");
+
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      throw new Error("Please log in before submitting a report.");
+    }
+
+    // Create FormData to send text fields and photo together
+    const formData = new FormData();
+
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("category", category);
+    formData.append("location", location);
+    formData.append("latitude", String(coordinates?.lat ?? ""));
+    formData.append("longitude", String(coordinates?.lng ?? ""));
+
+    // Attach photo only if the citizen selected one
+    if (photo) {
+      formData.append("photo", photo);
+    }
+
+    const response = await fetch("http://localhost:5000/api/reports", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to submit report.");
     }
 
     setMessage(
-      "Your report form is complete! This is a demonstration only. Connect the backend to save and track real reports."
+      `Report submitted successfully! Your report ID is ${data.report.id}.`
     );
-  };
+
+    // Clear the selected photo after successful submission
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
+    }
+
+    setPhoto(null);
+    setPhotoPreview("");
+
+    const input = document.getElementById("photo") as HTMLInputElement | null;
+
+    if (input) {
+      input.value = "";
+    }
+
+  } catch (error) {
+    console.error("Report submission error:", error);
+
+    setMessage(
+      error instanceof Error
+        ? error.message
+        : "Unable to submit your report. Please try again."
+    );
+  }
+};
+
+
 
   const handleClearForm = () => {
     if (photoPreview) {

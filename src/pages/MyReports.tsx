@@ -1,8 +1,9 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 type ReportStatus =
+  | "Pending"
   | "Submitted"
   | "Under Review"
   | "In Progress"
@@ -19,61 +20,19 @@ type Report = {
   description: string;
 };
 
-const sampleReports: Report[] = [
-  {
-    id: "CS-001",
-    title: "Road damage near main market",
-    category: "Roads",
-    date: "12 Oct 2026",
-    location: "Main Market Road",
-    status: "In Progress",
-    description:
-      "A damaged section of road is making travel difficult for residents and commuters.",
-  },
-  {
-    id: "CS-002",
-    title: "Garbage accumulation",
-    category: "Sanitation",
-    date: "10 Oct 2026",
-    location: "Community Park",
-    status: "Resolved",
-    description:
-      "Garbage had accumulated near the park entrance and needed collection.",
-  },
-  {
-    id: "CS-003",
-    title: "Broken streetlight",
-    category: "Streetlights",
-    date: "08 Oct 2026",
-    location: "Station Road",
-    status: "Under Review",
-    description:
-      "A streetlight is not working, leaving part of the road poorly lit at night.",
-  },
-  {
-    id: "CS-004",
-    title: "Blocked drainage",
-    category: "Drainage",
-    date: "06 Oct 2026",
-    location: "Residential Lane",
-    status: "Submitted",
-    description:
-      "A blocked drain is preventing water from flowing properly.",
-  },
-  {
-    id: "CS-005",
-    title: "Damaged public dustbin",
-    category: "Sanitation",
-    date: "04 Oct 2026",
-    location: "Bus Stand",
-    status: "Rejected",
-    description:
-      "The submitted report needs further clarification before the issue can be processed.",
-  },
-];
+type ApiReport = {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  location: string;
+  status: string;
+  created_at: string;
+};
 
 const statuses: Array<"All" | ReportStatus> = [
   "All",
+  "Pending",
   "Submitted",
   "Under Review",
   "In Progress",
@@ -81,14 +40,98 @@ const statuses: Array<"All" | ReportStatus> = [
   "Rejected",
 ];
 
+function formatStatus(status: string): ReportStatus {
+  const allowedStatuses: ReportStatus[] = [
+    "Pending",
+    "Submitted",
+    "Under Review",
+    "In Progress",
+    "Resolved",
+    "Rejected",
+  ];
+
+  return allowedStatuses.includes(status as ReportStatus)
+    ? (status as ReportStatus)
+    : "Pending";
+}
+
 function MyReports() {
+  const [reports, setReports] = useState<Report[]>([]);
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] =
     useState<"All" | ReportStatus>("All");
   const [selectedReport, setSelectedReport] =
     useState<Report | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const token = localStorage.getItem("token");
+
+if (!token) {
+  throw new Error("Please log in to view your reports.");
+}
+
+        const response = await fetch(
+          "http://localhost:5000/api/my-reports",
+          {
+            method: "GET",
+            headers: {
+               Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+        if (!response.ok) {
+         const errorData = await response.json();
+         throw new Error(errorData.message || "Unable to load reports.");
+        }
+
+        const data: {
+          success: boolean;
+          reports: ApiReport[];
+        } = await response.json();
+
+        const mappedReports: Report[] = data.reports.map(
+          (item) => ({
+            id: String(item.id),
+            title: item.title,
+            category: item.category,
+            date: new Date(item.created_at).toLocaleDateString(
+              "en-IN",
+              {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }
+            ),
+            location: item.location,
+            status: formatStatus(item.status),
+            description: item.description,
+          })
+        );
+
+        setReports(mappedReports);
+      } catch (err) {
+        console.error("Failed to load reports:", err);
+        setError(
+          "Could not load reports. Please check that the backend is running."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, []);
 
   const statusStyles: Record<ReportStatus, string> = {
+    Pending: "bg-amber-50 text-amber-700",
     Submitted: "bg-blue-50 text-blue-700",
     "Under Review": "bg-purple-50 text-purple-700",
     "In Progress": "bg-amber-50 text-amber-700",
@@ -96,7 +139,7 @@ function MyReports() {
     Rejected: "bg-red-50 text-red-700",
   };
 
-  const filteredReports = sampleReports.filter((report) => {
+  const filteredReports = reports.filter((report) => {
     const searchTerm = search.toLowerCase();
 
     const matchesSearch =
@@ -114,26 +157,28 @@ function MyReports() {
   const stats = [
     {
       label: "Total Reports",
-      value: sampleReports.length,
+      value: reports.length,
       color: "text-blue-700 bg-blue-50",
     },
     {
       label: "Submitted",
-      value: sampleReports.filter(
-        (report) => report.status === "Submitted"
+      value: reports.filter(
+        (report) =>
+          report.status === "Submitted" ||
+          report.status === "Pending"
       ).length,
       color: "text-indigo-700 bg-indigo-50",
     },
     {
       label: "In Progress",
-      value: sampleReports.filter(
+      value: reports.filter(
         (report) => report.status === "In Progress"
       ).length,
       color: "text-amber-700 bg-amber-50",
     },
     {
       label: "Resolved",
-      value: sampleReports.filter(
+      value: reports.filter(
         (report) => report.status === "Resolved"
       ).length,
       color: "text-green-700 bg-green-50",
@@ -148,7 +193,9 @@ function MyReports() {
             <p className="text-sm font-semibold uppercase tracking-wider text-blue-700">
               Citizen Portal
             </p>
-            <h1 className="mt-2 text-3xl font-bold">My Reports</h1>
+            <h1 className="mt-2 text-3xl font-bold">
+              My Reports
+            </h1>
             <p className="mt-2 text-slate-500">
               View your reported civic issues and track their progress.
             </p>
@@ -168,7 +215,9 @@ function MyReports() {
               key={stat.label}
               className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
             >
-              <p className="text-sm text-slate-500">{stat.label}</p>
+              <p className="text-sm text-slate-500">
+                {stat.label}
+              </p>
               <div className="mt-3 flex items-center gap-3">
                 <span
                   className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl font-bold ${stat.color}`}
@@ -192,7 +241,10 @@ function MyReports() {
 
             <div className="mt-5 flex flex-col gap-4 lg:flex-row">
               <div className="relative flex-1">
-                <label htmlFor="report-search" className="sr-only">
+                <label
+                  htmlFor="report-search"
+                  className="sr-only"
+                >
                   Search reports
                 </label>
                 <input
@@ -206,7 +258,10 @@ function MyReports() {
               </div>
 
               <div className="lg:w-56">
-                <label htmlFor="status-filter" className="sr-only">
+                <label
+                  htmlFor="status-filter"
+                  className="sr-only"
+                >
                   Filter by status
                 </label>
                 <select
@@ -229,88 +284,121 @@ function MyReports() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Report</th>
-                  <th className="px-6 py-4 font-semibold">Category</th>
-                  <th className="px-6 py-4 font-semibold">Date</th>
-                  <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 text-right font-semibold">
-                    Action
-                  </th>
-                </tr>
-              </thead>
+          {loading && (
+            <p className="px-6 py-12 text-center text-slate-500">
+              Loading reports...
+            </p>
+          )}
 
-              <tbody className="divide-y divide-slate-100">
-                {filteredReports.map((report) => (
-                  <tr key={report.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-slate-800">
-                        {report.title}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        {report.id}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">
-                      {report.category}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-600">
-                      {report.date}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[report.status]}`}
-                      >
-                        {report.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedReport(report)}
-                        className="font-semibold text-blue-700 hover:underline"
-                      >
-                        View details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredReports.length === 0 && (
+          {!loading && error && (
             <div className="px-6 py-12 text-center">
-              <p className="font-semibold text-slate-700">
-                No reports found
-              </p>
-              <p className="mt-2 text-sm text-slate-500">
-                Try a different search term or status filter.
-              </p>
+              <p className="text-red-600">{error}</p>
               <button
                 type="button"
-                onClick={() => {
-                  setSearch("");
-                  setSelectedStatus("All");
-                }}
+                onClick={() => window.location.reload()}
                 className="mt-4 font-semibold text-blue-700 hover:underline"
               >
-                Clear filters
+                Try again
               </button>
             </div>
           )}
 
-          <div className="border-t border-slate-200 px-5 py-4 text-sm text-slate-500">
-            Showing {filteredReports.length} of {sampleReports.length} sample
-            reports
-          </div>
+          {!loading && !error && (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-6 py-4 font-semibold">
+                        Report
+                      </th>
+                      <th className="px-6 py-4 font-semibold">
+                        Category
+                      </th>
+                      <th className="px-6 py-4 font-semibold">
+                        Date
+                      </th>
+                      <th className="px-6 py-4 font-semibold">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-right font-semibold">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredReports.map((report) => (
+                      <tr
+                        key={report.id}
+                        className="hover:bg-slate-50"
+                      >
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-slate-800">
+                            {report.title}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            #{report.id}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 text-slate-600">
+                          {report.category}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-slate-600">
+                          {report.date}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[report.status]}`}
+                          >
+                            {report.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedReport(report)}
+                            className="font-semibold text-blue-700 hover:underline"
+                          >
+                            View details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredReports.length === 0 && (
+                <div className="px-6 py-12 text-center">
+                  <p className="font-semibold text-slate-700">
+                    No reports found
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Try a different search term or status filter.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setSelectedStatus("All");
+                    }}
+                    className="mt-4 font-semibold text-blue-700 hover:underline"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
+
+              <div className="border-t border-slate-200 px-5 py-4 text-sm text-slate-500">
+                Showing {filteredReports.length} of {reports.length} reports
+              </div>
+            </>
+          )}
         </section>
 
         <p className="mt-6 text-center text-xs text-slate-400">
-          Demonstration data only. Real reports will be loaded from the backend.
+          Civic Sathi · One Citizen, One Step, One Nation.
         </p>
       </main>
 
@@ -329,7 +417,7 @@ function MyReports() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-blue-700">
-                  {selectedReport.id}
+                  Report #{selectedReport.id}
                 </p>
                 <h2
                   id="report-detail-title"

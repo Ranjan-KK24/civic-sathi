@@ -1,8 +1,11 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import type { FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 function Register() {
+  const navigate = useNavigate();
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -10,11 +13,14 @@ function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("error");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setMessage("");
 
     if (password.length < 8) {
       setMessageType("error");
@@ -28,10 +34,53 @@ function Register() {
       return;
     }
 
-    setMessageType("success");
-    setMessage(
-      "Registration form validated! Real account creation will be enabled after backend integration."
-    );
+    try {
+      setLoading(true);
+
+      const response = await fetch(
+        "http://localhost:5000/api/auth/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Registration failed.");
+      }
+
+      // Save the returned authentication details
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      setMessageType("success");
+      setMessage("Account created successfully!");
+
+      // Go to Dashboard after successful registration
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1000);
+
+    } catch (error) {
+      setMessageType("error");
+
+      if (error instanceof Error) {
+        setMessage(error.message);
+      } else {
+        setMessage("Unable to connect to the server.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -144,9 +193,7 @@ function Register() {
                 />
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowConfirmPassword((visible) => !visible)
-                  }
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
                   className="absolute inset-y-0 right-3 text-sm font-semibold text-blue-700 hover:text-blue-900"
                 >
                   {showConfirmPassword ? "Hide" : "Show"}
@@ -156,9 +203,10 @@ function Register() {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={loading}
+              className="w-full rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              Create Account
+              {loading ? "Creating Account..." : "Create Account"}
             </button>
 
             {message && (
@@ -178,10 +226,10 @@ function Register() {
           <p className="mt-6 text-center text-sm text-slate-600">
             Already have an account?{" "}
             <Link
-                to="/login"
-                className="font-semibold text-blue-700 hover:underline"
+              to="/login"
+              className="font-semibold text-blue-700 hover:underline"
             >
-            Sign in
+              Sign in
             </Link>
           </p>
         </section>

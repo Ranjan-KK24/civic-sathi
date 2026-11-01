@@ -1,18 +1,67 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import type { FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 function Login() {
+  const navigate = useNavigate();
+
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">("error");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage(
-      "Login interface is working. Account authentication will be added with the backend."
-    );
+    setMessage("");
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(
+        "http://localhost:5000/api/auth/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed.");
+      }
+
+      // Save authentication details
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      setMessageType("success");
+      setMessage("Login successful! Redirecting...");
+
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1000);
+
+    } catch (error) {
+      setMessageType("error");
+
+      if (error instanceof Error) {
+        setMessage(error.message);
+      } else {
+        setMessage("Unable to connect to the server.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -28,7 +77,7 @@ function Login() {
           <span className="text-2xl font-bold text-slate-900">
             Civic <span className="text-blue-700">Sathi</span>
           </span>
-        </a>
+        </Link>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg sm:p-8">
           <div className="text-center">
@@ -72,10 +121,10 @@ function Login() {
                   Password
                 </label>
                 <Link
-                    to="/forgot-password"
-                    className="text-sm font-medium text-blue-700 hover:underline"
+                  to="/forgot-password"
+                  className="text-sm font-medium text-blue-700 hover:underline"
                 >
-                Forgot password?
+                  Forgot password?
                 </Link>
               </div>
 
@@ -120,15 +169,20 @@ function Login() {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={loading}
+              className="w-full rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              Sign In
+              {loading ? "Signing In..." : "Sign In"}
             </button>
 
             {message && (
               <p
                 role="status"
-                className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800"
+                className={`rounded-lg p-3 text-sm ${
+                  messageType === "success"
+                    ? "bg-green-50 text-green-800"
+                    : "bg-red-50 text-red-800"
+                }`}
               >
                 {message}
               </p>
@@ -138,10 +192,10 @@ function Login() {
           <p className="mt-6 text-center text-sm text-slate-600">
             Don't have an account?{" "}
             <Link
-                to="/register"
-                className="font-semibold text-blue-700 hover:underline"
+              to="/register"
+              className="font-semibold text-blue-700 hover:underline"
             >
-                Create account
+              Create account
             </Link>
           </p>
         </section>

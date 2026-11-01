@@ -1,30 +1,30 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-const sampleReports = [
-  {
-    id: "CS-001",
-    title: "Road damage",
-    category: "Roads",
-    date: "12 Oct 2026",
-    status: "In Progress",
-  },
-  {
-    id: "CS-002",
-    title: "Garbage accumulation",
-    category: "Sanitation",
-    date: "10 Oct 2026",
-    status: "Resolved",
-  },
-  {
-    id: "CS-003",
-    title: "Broken streetlight",
-    category: "Streetlights",
-    date: "08 Oct 2026",
-    status: "Under Review",
-  },
-];
+type ReportStatus =
+  | "Pending"
+  | "Submitted"
+  | "Under Review"
+  | "In Progress"
+  | "Resolved"
+  | "Rejected";
+
+type Report = {
+  id: number;
+  title: string;
+  category: string;
+  date: string;
+  status: ReportStatus;
+};
+
+type ApiReport = {
+  id: number;
+  title: string;
+  category: string;
+  created_at: string;
+  status: string;
+};
 
 const navigation = [
   { label: "Dashboard", icon: "▦", href: "/dashboard" },
@@ -35,38 +35,111 @@ const navigation = [
   { label: "My Profile", icon: "♙", href: "/profile" },
 ];
 
+function formatStatus(status: string): ReportStatus {
+  const allowedStatuses: ReportStatus[] = [
+    "Pending",
+    "Submitted",
+    "Under Review",
+    "In Progress",
+    "Resolved",
+    "Rejected",
+  ];
+
+  return allowedStatuses.includes(status as ReportStatus)
+    ? (status as ReportStatus)
+    : "Pending";
+}
+
 function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const location = useLocation();
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          "http://localhost:5000/api/reports"
+        );
+
+        if (!response.ok) {
+          throw new Error("Unable to load reports.");
+        }
+
+        const data: {
+          success: boolean;
+          reports: ApiReport[];
+        } = await response.json();
+
+        setReports(
+          data.reports.map((item) => ({
+            id: item.id,
+            title: item.title,
+            category: item.category,
+            date: new Date(item.created_at).toLocaleDateString(
+              "en-IN",
+              {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }
+            ),
+            status: formatStatus(item.status),
+          }))
+        );
+      } catch (err) {
+        console.error("Failed to load dashboard reports:", err);
+        setError(
+          "Could not load reports. Please check that the backend is running."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, []);
 
   const stats = [
     {
       label: "Total Reports",
-      value: 12,
+      value: reports.length,
       icon: "▤",
       color: "bg-blue-50 text-blue-700",
     },
     {
       label: "In Progress",
-      value: 4,
+      value: reports.filter(
+        (report) => report.status === "In Progress"
+      ).length,
       icon: "◷",
       color: "bg-amber-50 text-amber-700",
     },
     {
       label: "Resolved",
-      value: 6,
+      value: reports.filter(
+        (report) => report.status === "Resolved"
+      ).length,
       icon: "✓",
       color: "bg-green-50 text-green-700",
     },
     {
       label: "Under Review",
-      value: 2,
+      value: reports.filter(
+        (report) => report.status === "Under Review"
+      ).length,
       icon: "◉",
       color: "bg-purple-50 text-purple-700",
     },
   ];
 
-  const statusStyle: Record<string, string> = {
+  const statusStyle: Record<ReportStatus, string> = {
+    Pending: "bg-amber-50 text-amber-700",
     Submitted: "bg-blue-50 text-blue-700",
     "Under Review": "bg-purple-50 text-purple-700",
     "In Progress": "bg-amber-50 text-amber-700",
@@ -178,9 +251,11 @@ function Dashboard() {
                   </span>
                 </div>
 
-                <p className="mt-4 text-3xl font-bold">{stat.value}</p>
+                <p className="mt-4 text-3xl font-bold">
+                  {loading ? "—" : stat.value}
+                </p>
                 <p className="mt-1 text-xs text-slate-400">
-                  Sample dashboard data
+                  Based on saved reports
                 </p>
               </article>
             ))}
@@ -209,24 +284,24 @@ function Dashboard() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <h2 className="text-lg font-bold">Your Contribution</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                Every civic report helps bring local problems to
-                attention.
+                Every civic report helps bring local problems to attention.
               </p>
 
               <div className="mt-6 flex items-end gap-3">
                 <span className="text-4xl font-bold text-blue-700">
-                  6
+                  {loading
+                    ? "—"
+                    : reports.filter(
+                        (report) => report.status === "Resolved"
+                      ).length}
                 </span>
                 <span className="pb-1 text-sm text-slate-500">
-                  sample issues resolved
+                  issues resolved
                 </span>
               </div>
 
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full w-1/2 rounded-full bg-blue-600" />
-              </div>
-              <p className="mt-2 text-xs text-slate-400">
-                Illustrative progress only
+              <p className="mt-4 text-xs text-slate-400">
+                Calculated from saved reports
               </p>
             </div>
           </section>
@@ -248,54 +323,86 @@ function Dashboard() {
               </Link>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[650px] text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                  <tr>
-                    <th className="px-6 py-4 font-semibold">Report</th>
-                    <th className="px-6 py-4 font-semibold">Category</th>
-                    <th className="px-6 py-4 font-semibold">Date</th>
-                    <th className="px-6 py-4 font-semibold">Status</th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100">
-                  {sampleReports.map((report) => (
-                    <tr key={report.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4">
-                        <p className="font-semibold text-slate-800">
-                          {report.title}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-400">
-                          {report.id}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600">
-                        {report.category}
-                      </td>
-                      <td className="px-6 py-4 text-slate-600">
-                        {report.date}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
-                            statusStyle[report.status]
-                          }`}
-                        >
-                          {report.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="border-t border-slate-200 p-4 text-center">
-              <p className="text-xs text-slate-400">
-                These are demonstration reports, not real citizen records.
+            {loading && (
+              <p className="px-6 py-10 text-center text-slate-500">
+                Loading reports...
               </p>
-            </div>
+            )}
+
+            {!loading && error && (
+              <p className="px-6 py-10 text-center text-red-600">
+                {error}
+              </p>
+            )}
+
+            {!loading && !error && (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[650px] text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="px-6 py-4 font-semibold">
+                          Report
+                        </th>
+                        <th className="px-6 py-4 font-semibold">
+                          Category
+                        </th>
+                        <th className="px-6 py-4 font-semibold">
+                          Date
+                        </th>
+                        <th className="px-6 py-4 font-semibold">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100">
+                      {reports.slice(0, 5).map((report) => (
+                        <tr
+                          key={report.id}
+                          className="hover:bg-slate-50"
+                        >
+                          <td className="px-6 py-4">
+                            <p className="font-semibold text-slate-800">
+                              {report.title}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-400">
+                              #{report.id}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4 text-slate-600">
+                            {report.category}
+                          </td>
+                          <td className="px-6 py-4 text-slate-600">
+                            {report.date}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyle[report.status]}`}
+                            >
+                              {report.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {reports.length === 0 && (
+                  <p className="px-6 py-10 text-center text-slate-500">
+                    No reports have been submitted yet.
+                  </p>
+                )}
+
+                <div className="border-t border-slate-200 p-4 text-center">
+                  <p className="text-xs text-slate-400">
+                    Showing the latest {Math.min(reports.length, 5)} of{" "}
+                    {reports.length} saved reports.
+                  </p>
+                </div>
+              </>
+            )}
           </section>
 
           <p className="mt-8 text-center text-xs text-slate-400">
