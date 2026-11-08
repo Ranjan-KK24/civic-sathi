@@ -1,3 +1,4 @@
+
 import multer from "multer";
 import * as path from "path";
 import { mkdirSync, unlinkSync } from "fs";
@@ -9,7 +10,13 @@ import dotenv from "dotenv";
 
 import authRoutes from "./auth";
 import { pool } from "./db";
-import { authenticateToken, AuthRequest } from "./authMiddleware";
+import {
+  authenticateToken,
+  requireAdmin,
+  AuthRequest
+} from "./authMiddleware";
+
+import adminRoutes from "./adminRoutes";
 
 dotenv.config();
 
@@ -51,11 +58,30 @@ const upload = multer({
 
 app.use(cors());
 app.use(express.json());
+
 // Serve uploaded photos
-app.use("/uploads", express.static(uploadDir));
+app.use("/uploads/reports", express.static(uploadDir));
 
 // Authentication routes
 app.use("/api/auth", authRoutes);
+
+// Admin routes
+app.use("/api/admin", adminRoutes);
+
+// Temporary admin authorization test
+app.get(
+  "/api/admin/test",
+  authenticateToken,
+  requireAdmin,
+  (req, res) => {
+    res.json({
+      success: true,
+      message: "Admin access granted!",
+      userId: (req as AuthRequest).userId,
+      role: (req as AuthRequest).role
+    });
+  }
+);
 
 // Welcome route
 app.get("/", (_req, res) => {
@@ -93,8 +119,6 @@ app.get("/api/db-test", async (_req, res) => {
     });
   }
 });
-
-// Submit report - LOGIN REQUIRED
 
 // Submit report with optional photo - LOGIN REQUIRED
 app.post(
@@ -208,29 +232,49 @@ app.post(
   }
 );
 
-// View reports - PUBLIC
+// Public reports API - SAFE DATA FOR EXPLORE MAP
 app.get("/api/reports", async (_req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM reports ORDER BY created_at DESC"
+      `SELECT
+         r.id,
+         r.title,
+         r.description,
+         r.category,
+         r.status,
+         r.location,
+         r.latitude,
+         r.longitude,
+         r.created_at,
+         rm.file_path AS photo_path
+       FROM reports r
+       LEFT JOIN LATERAL (
+         SELECT file_path
+         FROM report_media
+         WHERE report_id = r.id
+         ORDER BY created_at ASC
+         LIMIT 1
+       ) rm ON true
+       WHERE r.merged_into_report_id IS NULL
+       ORDER BY r.created_at DESC`
     );
 
-    res.json({
+    return res.json({
       success: true,
       count: result.rows.length,
       reports: result.rows,
     });
   } catch (error) {
-    console.error("Failed to fetch reports:", error);
+    console.error("Failed to fetch public reports:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to fetch reports.",
     });
   }
 });
 
-
+// My reports API
 app.get("/api/my-reports", authenticateToken, async (req, res) => {
   const userId = (req as AuthRequest).userId;
 
@@ -243,9 +287,22 @@ app.get("/api/my-reports", authenticateToken, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT * FROM reports
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
+      `SELECT
+         r.*,
+         rm.file_path AS photo_path,
+         primary_report.title AS primary_report_title
+       FROM reports r
+       LEFT JOIN reports primary_report
+         ON primary_report.id = r.merged_into_report_id
+       LEFT JOIN LATERAL (
+         SELECT file_path
+         FROM report_media
+         WHERE report_id = r.id
+         ORDER BY created_at ASC
+         LIMIT 1
+       ) rm ON true
+       WHERE r.user_id = $1
+       ORDER BY r.created_at DESC`,
       [userId]
     );
 
@@ -263,7 +320,6 @@ app.get("/api/my-reports", authenticateToken, async (req, res) => {
     });
   }
 });
-
 
 // Start server
 app.listen(PORT, () => {

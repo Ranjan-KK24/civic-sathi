@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   APIProvider,
   Map,
@@ -17,93 +17,149 @@ type CivicIssue = {
   status: string;
   description: string;
   location: string;
-  position: { lat: number; lng: number };
-  color: string;
+  position: {
+    lat: number;
+    lng: number;
+  };
+  photoUrl: string | null;
+  date: string;
 };
 
-const sampleIssues: CivicIssue[] = [
-  {
-    id: 1,
-    title: "Large pothole on road",
-    category: "Road Damage",
-    status: "In Progress",
-    description: "A pothole is making this road difficult to use.",
-    location: "Jaydev Vihar, Bhubaneswar",
-    position: { lat: 20.2965, lng: 85.8245 },
-    color: "#dc2626",
-  },
-  {
-    id: 2,
-    title: "Garbage not collected",
-    category: "Garbage",
-    status: "Submitted",
-    description: "Garbage has accumulated near the roadside.",
-    location: "Saheed Nagar, Bhubaneswar",
-    position: { lat: 20.2961, lng: 85.8422 },
-    color: "#d97706",
-  },
-  {
-    id: 3,
-    title: "Streetlight not working",
-    category: "Streetlight",
-    status: "Under Review",
-    description: "The streetlight is not turning on at night.",
-    location: "Patia, Bhubaneswar",
-    position: { lat: 20.3545, lng: 85.8175 },
-    color: "#7c3aed",
-  },
-  {
-    id: 4,
-    title: "Blocked roadside drain",
-    category: "Drainage",
-    status: "Submitted",
-    description: "Water is collecting because the drain appears blocked.",
-    location: "Khandagiri, Bhubaneswar",
-    position: { lat: 20.2566, lng: 85.7868 },
-    color: "#0284c7",
-  },
-  {
-    id: 5,
-    title: "Damaged road surface",
-    category: "Road Damage",
-    status: "Resolved",
-    description: "Demo report showing a resolved road issue.",
-    location: "Unit 4, Bhubaneswar",
-    position: { lat: 20.2785, lng: 85.8205 },
-    color: "#16a34a",
-  },
-];
+type ApiReport = {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  location: string;
+  latitude: string | number | null;
+  longitude: string | number | null;
+  created_at: string;
+  photo_path: string | null;
+};
 
-const categories = [
-  "All Categories",
-  "Road Damage",
-  "Garbage",
-  "Streetlight",
-  "Drainage",
-];
+const statusColors: Record<string, string> = {
+  Pending: "#dc2626",
+  Submitted: "#dc2626",
+  "Under Review": "#eab308",
+  "In Progress": "#eab308",
+  Resolved: "#16a34a",
+  Rejected: "#64748b",
+};
 
-const statuses = [
-  "All Statuses",
-  "Submitted",
-  "Under Review",
-  "In Progress",
-  "Resolved",
-];
+const getStatusColor = (status: string) =>
+  statusColors[status] || "#64748b";
 
 function ExploreMap() {
-  const [selectedIssue, setSelectedIssue] = useState<CivicIssue | null>(
-    null
-  );
+  const [issues, setIssues] = useState<CivicIssue[]>([]);
+  const [selectedIssue, setSelectedIssue] =
+    useState<CivicIssue | null>(null);
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Categories");
   const [status, setStatus] = useState("All Statuses");
 
-  const center = { lat: 20.2961, lng: 85.8245 };
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
+  // Fetch public reports from the backend
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          "http://localhost:5000/api/reports"
+        );
+
+        if (!response.ok) {
+          throw new Error("Unable to load civic reports.");
+        }
+
+        const data: {
+          success: boolean;
+          reports: ApiReport[];
+        } = await response.json();
+
+        if (!data.success || !Array.isArray(data.reports)) {
+          throw new Error("Invalid reports response from server.");
+        }
+
+        const mappedIssues: CivicIssue[] = data.reports
+          .map((report) => {
+            const lat = Number(report.latitude);
+            const lng = Number(report.longitude);
+
+            return {
+              id: report.id,
+              title: report.title,
+              category: report.category,
+              status: report.status,
+              description: report.description,
+              location: report.location,
+              position: {
+                lat,
+                lng,
+              },
+              photoUrl: report.photo_path
+                ? `http://localhost:5000${report.photo_path}`
+                : null,
+              date: new Date(report.created_at).toLocaleDateString(
+                "en-IN",
+                {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                }
+              ),
+            };
+          })
+          .filter(
+            (issue) =>
+              Number.isFinite(issue.position.lat) &&
+              Number.isFinite(issue.position.lng) &&
+              issue.position.lat >= -90 &&
+              issue.position.lat <= 90 &&
+              issue.position.lng >= -180 &&
+              issue.position.lng <= 180 &&
+              issue.position.lat !== 0 &&
+              issue.position.lng !== 0
+          );
+
+        setIssues(mappedIssues);
+      } catch (err) {
+        console.error("Explore Map error:", err);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load reports."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, []);
+
+  // Get categories from actual database reports
+  const categories = useMemo(
+    () => [
+      "All Categories",
+      ...Array.from(
+        new Set(issues.map((issue) => issue.category))
+      ).sort(),
+    ],
+    [issues]
+  );
+
+  // Filter reports
   const filteredIssues = useMemo(() => {
     const searchText = search.trim().toLowerCase();
 
-    return sampleIssues.filter((issue) => {
+    return issues.filter((issue) => {
       const matchesSearch =
         !searchText ||
         issue.title.toLowerCase().includes(searchText) ||
@@ -112,24 +168,52 @@ function ExploreMap() {
         String(issue.id).includes(searchText);
 
       const matchesCategory =
-        category === "All Categories" || issue.category === category;
+        category === "All Categories" ||
+        issue.category === category;
 
       const matchesStatus =
-        status === "All Statuses" || issue.status === status;
+        status === "All Statuses" ||
+        issue.status === status;
 
-      return matchesSearch && matchesCategory && matchesStatus;
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesStatus
+      );
     });
-  }, [search, category, status]);
+  }, [issues, search, category, status]);
+
+  const statuses = [
+    "All Statuses",
+    "Pending",
+    "Submitted",
+    "Under Review",
+    "In Progress",
+    "Resolved",
+    "Rejected",
+  ];
+
+  // Use the first available report location as the initial map center
+  const center = filteredIssues.length > 0
+    ? filteredIssues[0].position
+    : { lat: 20.2961, lng: 85.8245 };
 
   if (!apiKey) {
     return (
-      <div className="min-h-screen bg-slate-50 px-8 pb-8 pt-28">
-        <h1 className="text-2xl font-bold text-slate-900">Explore Map</h1>
+      <div className="min-h-screen bg-slate-50 p-8">
+        <h1 className="text-2xl font-bold text-slate-900">
+          Explore Map
+        </h1>
+
         <p className="mt-3 text-slate-600">
-          Google Maps API key is missing. Check .env.local and restart
-          the development server.
+          Google Maps API key is missing. Check .env.local
+          and restart the frontend server.
         </p>
-        <Link to="/dashboard" className="mt-4 inline-block text-blue-600">
+
+        <Link
+          to="/dashboard"
+          className="mt-4 inline-block text-blue-600"
+        >
           Back to Dashboard
         </Link>
       </div>
@@ -137,15 +221,18 @@ function ExploreMap() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-6 pt-28 sm:px-6">
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
       <div className="mx-auto max-w-7xl">
+
+        {/* Page Header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">
               Explore Map
             </h1>
+
             <p className="mt-2 text-slate-600">
-              Find civic issues around Bhubaneswar.
+              Discover reported civic issues and track their progress.
             </p>
           </div>
 
@@ -157,7 +244,9 @@ function ExploreMap() {
           </Link>
         </div>
 
+        {/* Search and Filters */}
         <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-3">
+
           <div>
             <label
               htmlFor="issue-search"
@@ -165,6 +254,7 @@ function ExploreMap() {
             >
               Search issues
             </label>
+
             <input
               id="issue-search"
               type="search"
@@ -182,6 +272,7 @@ function ExploreMap() {
             >
               Category
             </label>
+
             <select
               id="category-filter"
               value={category}
@@ -203,6 +294,7 @@ function ExploreMap() {
             >
               Status
             </label>
+
             <select
               id="status-filter"
               value={status}
@@ -218,10 +310,11 @@ function ExploreMap() {
           </div>
         </div>
 
+        {/* Map Information and Clear Filters */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-600" aria-live="polite">
             Showing <strong>{filteredIssues.length}</strong> of{" "}
-            <strong>{sampleIssues.length}</strong> demo issues
+            <strong>{issues.length}</strong> map reports
           </p>
 
           <button
@@ -238,99 +331,184 @@ function ExploreMap() {
           </button>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        {/* Status Legend */}
+        <div className="mb-4 flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-white p-4">
+
           {[
-            { label: "Road Damage", color: "#dc2626" },
-            { label: "Garbage", color: "#d97706" },
-            { label: "Streetlight", color: "#7c3aed" },
-            { label: "Drainage", color: "#0284c7" },
+            { label: "Pending / Submitted", color: "#dc2626" },
+            { label: "Under Review / In Progress", color: "#eab308" },
             { label: "Resolved", color: "#16a34a" },
+            { label: "Rejected", color: "#64748b" },
           ].map((item) => (
-            <div key={item.label} className="flex items-center gap-2">
+            <div
+              key={item.label}
+              className="flex items-center gap-2"
+            >
               <span
                 className="h-3 w-3 rounded-full"
                 style={{ backgroundColor: item.color }}
               />
-              <span className="text-sm text-slate-600">{item.label}</span>
+
+              <span className="text-sm text-slate-600">
+                {item.label}
+              </span>
             </div>
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="h-[65vh] min-h-[400px]">
-            <APIProvider apiKey={apiKey}>
-              <Map
-                defaultCenter={center}
-                defaultZoom={12}
-                mapId="civic-sathi-explore-map"
-                gestureHandling="greedy"
-                style={{ width: "100%", height: "100%" }}
-              >
-                {filteredIssues.map((issue) => (
-                  <AdvancedMarker
-                    key={issue.id}
-                    position={issue.position}
-                    title={issue.title}
-                    onClick={() => setSelectedIssue(issue)}
-                  >
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white shadow-lg"
-                      style={{ backgroundColor: issue.color }}
-                    >
-                      {issue.id}
-                    </div>
-                  </AdvancedMarker>
-                ))}
-
-                {selectedIssue &&
-                  filteredIssues.some(
-                    (issue) => issue.id === selectedIssue.id
-                  ) && (
-                    <InfoWindow
-                      position={selectedIssue.position}
-                      onCloseClick={() => setSelectedIssue(null)}
-                    >
-                      <div className="max-w-64 p-1">
-                        <h3 className="text-base font-bold text-slate-900">
-                          {selectedIssue.title}
-                        </h3>
-                        <p className="mt-1 text-sm text-slate-600">
-                          {selectedIssue.description}
-                        </p>
-                        <p className="mt-2 text-sm">
-                          <strong>Category:</strong> {selectedIssue.category}
-                        </p>
-                        <p className="mt-1 text-sm">
-                          <strong>Status:</strong> {selectedIssue.status}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {selectedIssue.location}
-                        </p>
-                        <p className="mt-2 text-xs text-slate-400">
-                          Demo report #{selectedIssue.id}
-                        </p>
-                      </div>
-                    </InfoWindow>
-                  )}
-              </Map>
-            </APIProvider>
-          </div>
-        </div>
-
-        {filteredIssues.length === 0 && (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            No issues match your search and filters. Try different options
-            or clear the filters.
+        {/* Loading */}
+        {loading && (
+          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-600">
+            Loading civic reports...
           </div>
         )}
 
+        {/* Error */}
+        {!loading && error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-red-700">
+            {error}
+
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="ml-2 font-semibold underline"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {/* Google Map */}
+        {!loading && !error && (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="h-[65vh] min-h-[400px]">
+              <APIProvider apiKey={apiKey}>
+                <Map
+                  defaultCenter={center}
+                  defaultZoom={12}
+                  mapId="civic-sathi-explore-map"
+                  gestureHandling="greedy"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                  }}
+                >
+
+                  {/* Report Markers */}
+                  {filteredIssues.map((issue) => (
+                    <AdvancedMarker
+                      key={issue.id}
+                      position={issue.position}
+                      title={issue.title}
+                      onClick={() => setSelectedIssue(issue)}
+                    >
+                      <div
+                        className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white shadow-lg"
+                        style={{
+                          backgroundColor: getStatusColor(issue.status),
+                        }}
+                      >
+                        {issue.id}
+                      </div>
+                    </AdvancedMarker>
+                  ))}
+
+                  {/* Selected Report Details */}
+                  {selectedIssue &&
+                    filteredIssues.some(
+                      (issue) => issue.id === selectedIssue.id
+                    ) && (
+                      <InfoWindow
+                        position={selectedIssue.position}
+                        onCloseClick={() => setSelectedIssue(null)}
+                      >
+                        <div className="w-64 p-1">
+                          <h3 className="text-base font-bold text-slate-900">
+                            {selectedIssue.title}
+                          </h3>
+
+                          <p className="mt-2 text-sm text-slate-600">
+                            {selectedIssue.description}
+                          </p>
+
+                          <div className="mt-3 space-y-2 text-sm">
+                            <p>
+                              <strong>Report ID:</strong>{" "}
+                              #{selectedIssue.id}
+                            </p>
+
+                            <p>
+                              <strong>Category:</strong>{" "}
+                              {selectedIssue.category}
+                            </p>
+
+                            <p>
+                              <strong>Status:</strong>{" "}
+                              <span
+                                style={{
+                                  color: getStatusColor(selectedIssue.status),
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {selectedIssue.status}
+                              </span>
+                            </p>
+
+                            <p>
+                              <strong>Location:</strong>{" "}
+                              {selectedIssue.location}
+                            </p>
+
+                            <p>
+                              <strong>Reported:</strong>{" "}
+                              {selectedIssue.date}
+                            </p>
+                          </div>
+
+                          {selectedIssue.photoUrl && (
+                            <div className="mt-3">
+                              <img
+                                src={selectedIssue.photoUrl}
+                                alt={`Evidence for report ${selectedIssue.id}`}
+                                className="max-h-40 w-full rounded-lg border border-slate-200 object-cover"
+                              />
+                            </div>
+                          )}
+
+                          {!selectedIssue.photoUrl && (
+                            <p className="mt-3 text-xs text-slate-400">
+                              No photo attached.
+                            </p>
+                          )}
+                        </div>
+                      </InfoWindow>
+                    )}
+                </Map>
+              </APIProvider>
+            </div>
+          </div>
+        )}
+
+        {/* No Reports */}
+        {!loading && !error && filteredIssues.length === 0 && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            No reports with valid map coordinates match your filters.
+          </div>
+        )}
+
+        {/* Privacy Notice */}
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4">
-          <h2 className="font-semibold text-slate-800">Civic Issue Map</h2>
+          <h2 className="font-semibold text-slate-800">
+            Public Civic Issue Map
+          </h2>
+
           <p className="mt-1 text-sm text-slate-600">
-            Search and filters update the visible markers. All reports are
-            sample data and are not verified citizen complaints.
+            Report details and uploaded evidence are visible to the public.
+            Personal information about the person who submitted a report
+            is not displayed.
           </p>
         </div>
+
       </div>
     </div>
   );

@@ -18,6 +18,9 @@ type Report = {
   location: string;
   status: ReportStatus;
   description: string;
+  photoUrl: string | null;
+  mergedIntoReportId: number | null;
+  primaryReportTitle: string | null;
 };
 
 type ApiReport = {
@@ -28,6 +31,9 @@ type ApiReport = {
   location: string;
   status: string;
   created_at: string;
+  photo_path: string | null;
+  merged_into_report_id: number | null;
+  primary_report_title: string | null;
 };
 
 const statuses: Array<"All" | ReportStatus> = [
@@ -73,23 +79,25 @@ function MyReports() {
 
         const token = localStorage.getItem("token");
 
-if (!token) {
-  throw new Error("Please log in to view your reports.");
-}
+        if (!token) {
+          throw new Error("Please log in to view your reports.");
+        }
 
         const response = await fetch(
           "http://localhost:5000/api/my-reports",
           {
             method: "GET",
             headers: {
-               Authorization: `Bearer ${token}`,
-              },
-            }
-          );
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         if (!response.ok) {
-         const errorData = await response.json();
-         throw new Error(errorData.message || "Unable to load reports.");
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || "Unable to load reports."
+          );
         }
 
         const data: {
@@ -113,6 +121,11 @@ if (!token) {
             location: item.location,
             status: formatStatus(item.status),
             description: item.description,
+            photoUrl: item.photo_path
+              ? `http://localhost:5000${item.photo_path}`
+              : null,
+            mergedIntoReportId: item.merged_into_report_id,
+            primaryReportTitle: item.primary_report_title,
           })
         );
 
@@ -120,7 +133,9 @@ if (!token) {
       } catch (err) {
         console.error("Failed to load reports:", err);
         setError(
-          "Could not load reports. Please check that the backend is running."
+          err instanceof Error
+            ? err.message
+            : "Could not load reports. Please check that the backend is running."
         );
       } finally {
         setLoading(false);
@@ -193,9 +208,11 @@ if (!token) {
             <p className="text-sm font-semibold uppercase tracking-wider text-blue-700">
               Citizen Portal
             </p>
+
             <h1 className="mt-2 text-3xl font-bold">
               My Reports
             </h1>
+
             <p className="mt-2 text-slate-500">
               View your reported civic issues and track their progress.
             </p>
@@ -209,6 +226,7 @@ if (!token) {
           </Link>
         </div>
 
+        {/* Report Statistics */}
         <div className="mt-8 grid grid-cols-2 gap-4 xl:grid-cols-4">
           {stats.map((stat) => (
             <article
@@ -218,12 +236,14 @@ if (!token) {
               <p className="text-sm text-slate-500">
                 {stat.label}
               </p>
+
               <div className="mt-3 flex items-center gap-3">
                 <span
                   className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl font-bold ${stat.color}`}
                 >
                   {stat.value}
                 </span>
+
                 <span className="text-sm font-medium text-slate-600">
                   reports
                 </span>
@@ -232,9 +252,13 @@ if (!token) {
           ))}
         </div>
 
+        {/* Reports Table */}
         <section className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 p-5 sm:p-6">
-            <h2 className="text-lg font-bold">All Reports</h2>
+            <h2 className="text-lg font-bold">
+              All Reports
+            </h2>
+
             <p className="mt-1 text-sm text-slate-500">
               Search reports or filter them by their current status.
             </p>
@@ -247,11 +271,14 @@ if (!token) {
                 >
                   Search reports
                 </label>
+
                 <input
                   id="report-search"
                   type="search"
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) =>
+                    setSearch(event.target.value)
+                  }
                   placeholder="Search by title, report ID or location..."
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 />
@@ -264,6 +291,7 @@ if (!token) {
                 >
                   Filter by status
                 </label>
+
                 <select
                   id="status-filter"
                   value={selectedStatus}
@@ -276,7 +304,9 @@ if (!token) {
                 >
                   {statuses.map((status) => (
                     <option key={status} value={status}>
-                      {status === "All" ? "All statuses" : status}
+                      {status === "All"
+                        ? "All statuses"
+                        : status}
                     </option>
                   ))}
                 </select>
@@ -293,6 +323,7 @@ if (!token) {
           {!loading && error && (
             <div className="px-6 py-12 text-center">
               <p className="text-red-600">{error}</p>
+
               <button
                 type="button"
                 onClick={() => window.location.reload()}
@@ -312,15 +343,19 @@ if (!token) {
                       <th className="px-6 py-4 font-semibold">
                         Report
                       </th>
+
                       <th className="px-6 py-4 font-semibold">
                         Category
                       </th>
+
                       <th className="px-6 py-4 font-semibold">
                         Date
                       </th>
+
                       <th className="px-6 py-4 font-semibold">
                         Status
                       </th>
+
                       <th className="px-6 py-4 text-right font-semibold">
                         Action
                       </th>
@@ -337,16 +372,26 @@ if (!token) {
                           <p className="font-semibold text-slate-800">
                             {report.title}
                           </p>
+
                           <p className="mt-1 text-xs text-slate-400">
                             #{report.id}
                           </p>
+
+                          {report.mergedIntoReportId !== null && (
+                            <p className="mt-2 text-xs font-medium text-amber-700">
+                              Merged into Report #{report.mergedIntoReportId}
+                            </p>
+                          )}
                         </td>
+
                         <td className="px-6 py-4 text-slate-600">
                           {report.category}
                         </td>
+
                         <td className="whitespace-nowrap px-6 py-4 text-slate-600">
                           {report.date}
                         </td>
+
                         <td className="px-6 py-4">
                           <span
                             className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[report.status]}`}
@@ -354,6 +399,7 @@ if (!token) {
                             {report.status}
                           </span>
                         </td>
+
                         <td className="px-6 py-4 text-right">
                           <button
                             type="button"
@@ -374,9 +420,11 @@ if (!token) {
                   <p className="font-semibold text-slate-700">
                     No reports found
                   </p>
+
                   <p className="mt-2 text-sm text-slate-500">
                     Try a different search term or status filter.
                   </p>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -402,6 +450,7 @@ if (!token) {
         </p>
       </main>
 
+      {/* View Report Details Modal */}
       {selectedReport && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4"
@@ -411,7 +460,7 @@ if (!token) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="report-detail-title"
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl sm:p-8"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-8"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
@@ -419,6 +468,7 @@ if (!token) {
                 <p className="text-sm font-semibold text-blue-700">
                   Report #{selectedReport.id}
                 </p>
+
                 <h2
                   id="report-detail-title"
                   className="mt-2 text-2xl font-bold"
@@ -445,6 +495,21 @@ if (!token) {
               </span>
             </div>
 
+            {selectedReport.mergedIntoReportId !== null && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">This report was merged</p>
+                <p className="mt-1">
+                  Your report remains in your history and was merged into{" "}
+                  <strong>
+                    Report #{selectedReport.mergedIntoReportId}
+                    {selectedReport.primaryReportTitle
+                      ? ` — ${selectedReport.primaryReportTitle}`
+                      : ""}
+                  </strong>.
+                </p>
+              </div>
+            )}
+
             <dl className="mt-6 space-y-4 text-sm">
               <div>
                 <dt className="text-slate-500">Category</dt>
@@ -452,18 +517,40 @@ if (!token) {
                   {selectedReport.category}
                 </dd>
               </div>
+
               <div>
                 <dt className="text-slate-500">Reported date</dt>
                 <dd className="mt-1 font-semibold">
                   {selectedReport.date}
                 </dd>
               </div>
+
               <div>
                 <dt className="text-slate-500">Location</dt>
                 <dd className="mt-1 font-semibold">
                   {selectedReport.location}
                 </dd>
               </div>
+
+              {/* Attached Photo */}
+              <div>
+                <dt className="text-slate-500">Attached Photo</dt>
+
+                <dd className="mt-2">
+                  {selectedReport.photoUrl ? (
+                    <img
+                      src={selectedReport.photoUrl}
+                      alt={`Photo for report ${selectedReport.id}`}
+                      className="w-full max-h-72 rounded-xl border border-slate-200 object-contain"
+                    />
+                  ) : (
+                    <p className="rounded-lg bg-slate-50 p-4 text-slate-400">
+                      No photo attached to this report.
+                    </p>
+                  )}
+                </dd>
+              </div>
+
               <div>
                 <dt className="text-slate-500">Description</dt>
                 <dd className="mt-1 leading-6 text-slate-700">
