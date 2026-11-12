@@ -20,19 +20,13 @@ function Login() {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        "http://localhost:5000/api/auth/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        }
-      );
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
       const data = await response.json();
 
@@ -40,7 +34,6 @@ function Login() {
         throw new Error(data.message || "Login failed.");
       }
 
-      // Save authentication details
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
@@ -48,17 +41,19 @@ function Login() {
       setMessage("Login successful! Redirecting...");
 
       setTimeout(() => {
-        navigate("/dashboard");
-      }, 1000);
-
+        if (data.user.role === "admin") {
+          navigate("/admin");
+        } else {
+          navigate("/dashboard");
+        }
+      }, 800);
     } catch (error) {
       setMessageType("error");
-
-      if (error instanceof Error) {
-        setMessage(error.message);
-      } else {
-        setMessage("Unable to connect to the server.");
-      }
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to connect to the server."
+      );
     } finally {
       setLoading(false);
     }
@@ -67,10 +62,7 @@ function Login() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 pb-12 pt-28">
       <div className="w-full max-w-md">
-        <Link
-          to="/"
-          className="mb-8 flex items-center justify-center gap-2"
-        >
+        <Link to="/" className="mb-8 flex items-center justify-center gap-2">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-700 text-xl font-bold text-white">
             C
           </span>
@@ -91,10 +83,7 @@ function Login() {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
-              <label
-                htmlFor="email"
-                className="mb-2 block text-sm font-semibold text-slate-700"
-              >
+              <label htmlFor="email" className="mb-2 block text-sm font-semibold text-slate-700">
                 Email address
               </label>
               <input
@@ -114,16 +103,10 @@ function Login() {
 
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <label
-                  htmlFor="password"
-                  className="text-sm font-semibold text-slate-700"
-                >
+                <label htmlFor="password" className="text-sm font-semibold text-slate-700">
                   Password
                 </label>
-                <Link
-                  to="/forgot-password"
-                  className="text-sm font-medium text-blue-700 hover:underline"
-                >
+                <Link to="/forgot-password" className="text-sm font-medium text-blue-700 hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -159,10 +142,7 @@ function Login() {
                 type="checkbox"
                 className="h-4 w-4 rounded border-slate-300 accent-blue-700"
               />
-              <label
-                htmlFor="remember"
-                className="text-sm text-slate-600"
-              >
+              <label htmlFor="remember" className="text-sm text-slate-600">
                 Remember me on this device
               </label>
             </div>
@@ -191,10 +171,7 @@ function Login() {
 
           <p className="mt-6 text-center text-sm text-slate-600">
             Don't have an account?{" "}
-            <Link
-              to="/register"
-              className="font-semibold text-blue-700 hover:underline"
-            >
+            <Link to="/register" className="font-semibold text-blue-700 hover:underline">
               Create account
             </Link>
           </p>

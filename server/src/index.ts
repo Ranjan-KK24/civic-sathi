@@ -10,10 +10,11 @@ import dotenv from "dotenv";
 
 import authRoutes from "./auth";
 import { pool } from "./db";
+
 import {
   authenticateToken,
   requireAdmin,
-  AuthRequest
+  AuthRequest,
 } from "./authMiddleware";
 
 import adminRoutes from "./adminRoutes";
@@ -23,13 +24,14 @@ dotenv.config();
 const app = express();
 const PORT = 5000;
 
-// Photo upload configuration
+// ==========================================
+// PHOTO UPLOAD CONFIGURATION
+// ==========================================
+
 const uploadDir = path.join(process.cwd(), "uploads", "reports");
 
-// Create upload folder if it does not exist
 mkdirSync(uploadDir, { recursive: true });
 
-// Configure where photos will be stored
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, uploadDir);
@@ -41,7 +43,6 @@ const storage = multer.diskStorage({
   },
 });
 
-// Accept image files up to 5 MB
 const upload = multer({
   storage,
   limits: {
@@ -56,19 +57,23 @@ const upload = multer({
   },
 });
 
+// ==========================================
+// MIDDLEWARE
+// ==========================================
+
 app.use(cors());
 app.use(express.json());
 
-// Serve uploaded photos
 app.use("/uploads/reports", express.static(uploadDir));
 
-// Authentication routes
-app.use("/api/auth", authRoutes);
+// ==========================================
+// AUTHENTICATION AND ADMIN ROUTES
+// ==========================================
 
-// Admin routes
+app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 
-// Temporary admin authorization test
+// Admin authorization test
 app.get(
   "/api/admin/test",
   authenticateToken,
@@ -78,10 +83,14 @@ app.get(
       success: true,
       message: "Admin access granted!",
       userId: (req as AuthRequest).userId,
-      role: (req as AuthRequest).role
+      role: (req as AuthRequest).role,
     });
   }
 );
+
+// ==========================================
+// BASIC ROUTES
+// ==========================================
 
 // Welcome route
 app.get("/", (_req, res) => {
@@ -90,7 +99,7 @@ app.get("/", (_req, res) => {
   });
 });
 
-// Health check route
+// Health check
 app.get("/api/health", (_req, res) => {
   res.json({
     success: true,
@@ -98,7 +107,7 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// Database test route
+// Database test
 app.get("/api/db-test", async (_req, res) => {
   try {
     const result = await pool.query(
@@ -120,7 +129,11 @@ app.get("/api/db-test", async (_req, res) => {
   }
 });
 
-// Submit report with optional photo - LOGIN REQUIRED
+// ==========================================
+// SUBMIT REPORT WITH PHOTO
+// LOGIN REQUIRED
+// ==========================================
+
 app.post(
   "/api/reports",
   authenticateToken,
@@ -180,7 +193,7 @@ app.post(
       const report = reportResult.rows[0];
       let media = null;
 
-      // Save photo details if a photo was uploaded
+      // Save photo details
       if (req.file) {
         const filePath = `/uploads/reports/${req.file.filename}`;
 
@@ -232,7 +245,11 @@ app.post(
   }
 );
 
-// Public reports API - SAFE DATA FOR EXPLORE MAP
+// ==========================================
+// PUBLIC REPORTS API
+// SAFE DATA FOR EXPLORE MAP
+// ==========================================
+
 app.get("/api/reports", async (_req, res) => {
   try {
     const result = await pool.query(
@@ -274,7 +291,11 @@ app.get("/api/reports", async (_req, res) => {
   }
 });
 
-// My reports API
+// ==========================================
+// MY REPORTS API
+// LOGIN REQUIRED
+// ==========================================
+
 app.get("/api/my-reports", authenticateToken, async (req, res) => {
   const userId = (req as AuthRequest).userId;
 
@@ -321,7 +342,254 @@ app.get("/api/my-reports", authenticateToken, async (req, res) => {
   }
 });
 
-// Start server
+// ==========================================
+// CITIZEN NOTIFICATIONS API
+// ==========================================
+
+// GET all notifications for logged-in citizen
+app.get("/api/notifications", authenticateToken, async (req, res) => {
+  const userId = (req as AuthRequest).userId;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT
+         id,
+         report_id,
+         title,
+         message,
+         notification_type,
+         is_read,
+         created_at
+       FROM notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      count: result.rows.length,
+      unreadCount: result.rows.filter(
+        (notification) => !notification.is_read
+      ).length,
+      notifications: result.rows,
+    });
+  } catch (error) {
+    console.error("Notifications fetch error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch notifications.",
+    });
+  }
+});
+
+// MARK one notification as read
+app.patch(
+  "/api/notifications/:id/read",
+  authenticateToken,
+  async (req, res) => {
+    const userId = (req as AuthRequest).userId;
+    const notificationId = Number(req.params.id);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    if (!Number.isInteger(notificationId) || notificationId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid notification ID.",
+      });
+    }
+
+    try {
+      const result = await pool.query(
+        `UPDATE notifications
+         SET is_read = TRUE
+         WHERE id = $1 AND user_id = $2
+         RETURNING id`,
+        [notificationId, userId]
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Notification not found.",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Notification marked as read.",
+      });
+    } catch (error) {
+      console.error("Mark notification read error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update notification.",
+      });
+    }
+  }
+);
+
+// MARK one notification as unread
+app.patch(
+  "/api/notifications/:id/unread",
+  authenticateToken,
+  async (req, res) => {
+    const userId = (req as AuthRequest).userId;
+    const notificationId = Number(req.params.id);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    if (!Number.isInteger(notificationId) || notificationId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid notification ID.",
+      });
+    }
+
+    try {
+      const result = await pool.query(
+        `UPDATE notifications
+         SET is_read = FALSE
+         WHERE id = $1 AND user_id = $2
+         RETURNING id`,
+        [notificationId, userId]
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Notification not found.",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Notification marked as unread.",
+      });
+    } catch (error) {
+      console.error("Mark notification unread error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update notification.",
+      });
+    }
+  }
+);
+
+// MARK all notifications as read
+app.patch(
+  "/api/notifications/read-all",
+  authenticateToken,
+  async (req, res) => {
+    const userId = (req as AuthRequest).userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    try {
+      await pool.query(
+        `UPDATE notifications
+         SET is_read = TRUE
+         WHERE user_id = $1`,
+        [userId]
+      );
+
+      return res.json({
+        success: true,
+        message: "All notifications marked as read.",
+      });
+    } catch (error) {
+      console.error("Mark all notifications read error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update notifications.",
+      });
+    }
+  }
+);
+
+// DELETE one notification
+app.delete(
+  "/api/notifications/:id",
+  authenticateToken,
+  async (req, res) => {
+    const userId = (req as AuthRequest).userId;
+    const notificationId = Number(req.params.id);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    if (!Number.isInteger(notificationId) || notificationId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid notification ID.",
+      });
+    }
+
+    try {
+      const result = await pool.query(
+        `DELETE FROM notifications
+         WHERE id = $1 AND user_id = $2
+         RETURNING id`,
+        [notificationId, userId]
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Notification not found.",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Notification deleted.",
+      });
+    } catch (error) {
+      console.error("Delete notification error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to delete notification.",
+      });
+    }
+  }
+);
+
+// ==========================================
+// START SERVER
+// ==========================================
+
 app.listen(PORT, () => {
   console.log(`Civic Sathi backend running at http://localhost:${PORT}`);
 });

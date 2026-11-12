@@ -34,6 +34,12 @@ router.get("/reports", async (_req, res: Response) => {
          r.latitude,
          r.longitude,
          r.created_at,
+         r.merged_into_report_id,
+         r.merged_at,
+         r.merged_by,
+         r.resolution_summary,
+         r.municipality_response,
+         r.resolution_date,
          rm.file_path AS photo_path
        FROM reports r
        LEFT JOIN users u ON r.user_id = u.id
@@ -65,15 +71,107 @@ router.get("/reports", async (_req, res: Response) => {
 
 
 // ==========================================
+// GET REPORT ACTIVITY HISTORY - ADMIN ONLY
+// ==========================================
+
+router.get(
+  "/reports/:id/history",
+  async (req: Request, res: Response) => {
+    const reportId = Number(req.params.id);
+
+    if (!Number.isInteger(reportId) || reportId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid report ID."
+      });
+    }
+
+    try {
+      // Get report submission details
+      const reportResult = await pool.query(
+        `SELECT id, title, created_at
+         FROM reports
+         WHERE id = $1`,
+        [reportId]
+      );
+
+      if (reportResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Report not found."
+        });
+      }
+
+      // Get all status changes and admin details
+      const historyResult = await pool.query(
+        `SELECT
+           h.id,
+           h.old_status,
+           h.new_status,
+           h.reason,
+           h.created_at,
+           u.name AS changed_by_name
+         FROM report_status_history h
+         LEFT JOIN users u ON h.changed_by = u.id
+         WHERE h.report_id = $1
+         ORDER BY h.created_at ASC`,
+        [reportId]
+      );
+
+      // Get all forwarding events and admin details
+      const forwardingResult = await pool.query(
+        `SELECT
+           rf.id,
+           rf.authority_name,
+           rf.department,
+           rf.reference_number,
+           rf.forwarding_channel,
+           rf.notes,
+           rf.created_at,
+           u.name AS forwarded_by_name
+         FROM report_forwardings rf
+         LEFT JOIN users u ON rf.forwarded_by = u.id
+         WHERE rf.report_id = $1
+         ORDER BY rf.created_at ASC`,
+        [reportId]
+      );
+
+      return res.json({
+        success: true,
+        report: reportResult.rows[0],
+        history: historyResult.rows,
+        forwardings: forwardingResult.rows
+      });
+
+    } catch (error) {
+      console.error("Report activity fetch error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch report activity."
+      });
+    }
+  }
+);
+
+
+// ==========================================
 // UPDATE REPORT STATUS - ADMIN ONLY
 // ==========================================
 
 router.patch(
   "/reports/:id/status",
   async (req: Request, res: Response) => {
-
     const reportId = Number(req.params.id);
-    const { status, reason } = req.body;
+
+    const {
+      status,
+      reason,
+      resolution_summary,
+      municipality_response,
+      resolution_date
+    } = req.body;
+
     const adminId = (req as AuthRequest).userId;
 
     const allowedStatuses = [
@@ -111,14 +209,38 @@ router.patch(
       });
     }
 
+    // Resolution details are required when marking Resolved
+    if (
+      status === "Resolved" &&
+      (
+        typeof resolution_summary !== "string" ||
+        !resolution_summary.trim() ||
+        typeof municipality_response !== "string" ||
+        !municipality_response.trim() ||
+        typeof resolution_date !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(resolution_date) ||
+        Number.isNaN(Date.parse(resolution_date)) ||
+        new Date(resolution_date).toISOString().slice(0, 10) !== resolution_date
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Resolution summary, municipality response and valid resolution date are required."
+      });
+    }
+
     const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
 
-      // Find and lock report
       const reportResult = await client.query(
-        `SELECT status, merged_into_report_id
+        `SELECT
+           id,
+           user_id,
+           title,
+           status,
+           merged_into_report_id
          FROM reports
          WHERE id = $1
          FOR UPDATE`,
@@ -156,44 +278,43 @@ router.patch(
         });
       }
 
-      // Authority confirmation required before resolution
+      // Update status and resolution details
       if (status === "Resolved") {
-        const confirmationResult = await client.query(
-          `SELECT ac.id
-           FROM authority_confirmations ac
-           INNER JOIN report_forwardings rf
-             ON rf.id = ac.forwarding_id
-           INNER JOIN users u
-             ON u.id = ac.verified_by
-           WHERE rf.report_id = $1
-             AND u.role = 'admin'
-           LIMIT 1`,
-          [reportId]
+        await client.query(
+          `UPDATE reports
+           SET status = $1,
+               resolution_summary = $2,
+               municipality_response = $3,
+               resolution_date = $4::date
+           WHERE id = $5`,
+          [
+            status,
+            resolution_summary.trim(),
+            municipality_response.trim(),
+            resolution_date,
+            reportId
+          ]
         );
 
-        if (confirmationResult.rows.length === 0) {
-          await client.query("ROLLBACK");
-
-          return res.status(400).json({
-            success: false,
-            message:
-              "Verified authority confirmation is required before resolving this report."
-          });
-        }
+      } else {
+        await client.query(
+          `UPDATE reports
+           SET status = $1
+           WHERE id = $2`,
+          [status, reportId]
+        );
       }
-
-      // Update report status
-      await client.query(
-        `UPDATE reports
-         SET status = $1
-         WHERE id = $2`,
-        [status, reportId]
-      );
 
       // Record status change
       await client.query(
         `INSERT INTO report_status_history
-          (report_id, old_status, new_status, changed_by, reason)
+         (
+           report_id,
+           old_status,
+           new_status,
+           changed_by,
+           reason
+         )
          VALUES ($1, $2, $3, $4, $5)`,
         [
           reportId,
@@ -203,6 +324,54 @@ router.patch(
           typeof reason === "string" && reason.trim()
             ? reason.trim()
             : null
+        ]
+      );
+
+      // Create notification for the citizen
+      const citizenId = report.user_id;
+      const reportTitle = report.title;
+
+      let notificationTitle = `Report ${status.toLowerCase()}`;
+      let notificationMessage =
+        `Your report "${reportTitle}" has been updated to ${status}.`;
+      let notificationType = "status";
+
+      if (status === "Resolved") {
+        notificationTitle = "Issue resolved";
+
+        notificationMessage =
+          `Your report "${reportTitle}" has been marked as resolved.\n\n` +
+          `Resolution Summary: ${resolution_summary.trim()}\n\n` +
+          `Municipality Response: ${municipality_response.trim()}`;
+
+        notificationType = "success";
+
+      } else if (status === "Rejected") {
+        notificationTitle = "Report rejected";
+
+        notificationMessage =
+          `Your report "${reportTitle}" has been rejected.\n\n` +
+          `Reason for rejection: ${reason.trim()}`;
+
+        notificationType = "info";
+      }
+
+      await client.query(
+        `INSERT INTO notifications
+         (
+           user_id,
+           report_id,
+           title,
+           message,
+           notification_type
+         )
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          citizenId,
+          reportId,
+          notificationTitle,
+          notificationMessage,
+          notificationType
         ]
       );
 
@@ -241,7 +410,6 @@ router.patch(
 router.post(
   "/reports/:id/forward",
   async (req: Request, res: Response) => {
-
     const reportId = Number(req.params.id);
     const adminId = (req as AuthRequest).userId;
 
@@ -335,7 +503,8 @@ router.post(
 
       // Save forwarding details
       const forwardingResult = await client.query(
-        `INSERT INTO report_forwardings (
+        `INSERT INTO report_forwardings
+         (
            report_id,
            authority_name,
            department,
@@ -368,7 +537,8 @@ router.post(
 
         // Record status history
         await client.query(
-          `INSERT INTO report_status_history (
+          `INSERT INTO report_status_history
+           (
              report_id,
              old_status,
              new_status,
@@ -421,7 +591,6 @@ router.post(
 router.post(
   "/reports/:id/confirmation",
   async (req: Request, res: Response) => {
-
     const reportId = Number(req.params.id);
     const adminId = (req as AuthRequest).userId;
 
@@ -535,7 +704,8 @@ router.post(
 
       // Save authority confirmation
       const confirmationResult = await client.query(
-        `INSERT INTO authority_confirmations (
+        `INSERT INTO authority_confirmations
+         (
            forwarding_id,
            confirmation_source,
            confirmation_date,
@@ -654,7 +824,6 @@ router.get("/duplicates", async (_req, res: Response) => {
 router.patch(
   "/duplicates/:id/review",
   async (req: Request, res: Response) => {
-
     const reviewId = Number(req.params.id);
     const adminId = (req as AuthRequest).userId;
     const { decision, review_notes } = req.body;
@@ -755,7 +924,6 @@ router.patch(
 router.post(
   "/duplicates/:id/merge",
   async (req: Request, res: Response) => {
-
     const reviewId = Number(req.params.id);
     const adminId = (req as AuthRequest).userId;
     const primaryReportId = Number(req.body.primary_report_id);
